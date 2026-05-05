@@ -65,3 +65,20 @@ test("validateBody accepts a prompt at exactly the 50k boundary", () => {
   const r = validateBody({ prompt: exact });
   assert.equal("error" in r, false);
 });
+
+test("validateBody rejects unknown mode strings with 400", () => {
+  const r = validateBody({ prompt: "hi", mode: "wat" });
+  assert.equal("error" in r, true);
+  if ("error" in r) {
+    assert.equal(r.status, 400);
+    assert.match(r.error, /Invalid mode/i);
+  }
+});
+
+test("validateBody rejects non-string mode values", () => {
+  for (const mode of [123, true, ["ai"], { mode: "ai" }]) {
+    const r = validateBody({ prompt: "hi", mode });
+    assert.equal("error" in r, true);
+    if ("error" in r) assert.equal(r.status, 400);
+  }
+});

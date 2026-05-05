@@ -38,17 +38,19 @@ export default function InfluenceMap() {
           </p>
         </div>
         <button
+          type="button"
           onClick={() => setHideLow((v) => !v)}
-          className="btn-ghost inline-flex items-center gap-2 text-sm"
+          aria-pressed={hideLow}
+          className="btn-ghost inline-flex items-center gap-2 text-sm focus:outline-none focus-visible:ring-2 focus-visible:ring-neon"
         >
           {hideLow ? (
             <>
-              <Eye className="w-4 h-4" />
+              <Eye className="w-4 h-4" aria-hidden="true" />
               show low-signal
             </>
           ) : (
             <>
-              <EyeOff className="w-4 h-4" />
+              <EyeOff className="w-4 h-4" aria-hidden="true" />
               hide low-signal
             </>
           )}
@@ -57,19 +59,30 @@ export default function InfluenceMap() {
 
       <div className="grid grid-cols-1 lg:grid-cols-5 gap-5">
         <div className="card lg:col-span-3 p-5">
-          <div className="text-xs uppercase tracking-[0.18em] text-muted mb-2">
+          <label
+            htmlFor="influence-prompt"
+            className="block text-xs uppercase tracking-[0.18em] text-muted mb-2"
+          >
             prompt
-          </div>
+          </label>
           <textarea
+            id="influence-prompt"
             value={text}
             onChange={(e) => setText(e.target.value)}
-            className="w-full min-h-[200px] bg-surface-2 border border-border rounded-lg p-3 text-sm font-mono text-foreground focus:outline-none focus:border-neon resize-y"
+            className="w-full min-h-[200px] bg-surface-2 border border-border rounded-lg p-3 text-sm font-mono text-foreground focus:outline-none focus:border-neon focus-visible:ring-2 focus-visible:ring-neon resize-y"
           />
 
-          <div className="mt-5 text-xs uppercase tracking-[0.18em] text-muted mb-3">
+          <div
+            id="heatmap-label"
+            className="mt-5 text-xs uppercase tracking-[0.18em] text-muted mb-3"
+          >
             heatmap
           </div>
-          <div className="card-2 p-4 leading-[2] font-mono text-[14px]">
+          <div
+            className="card-2 p-4 leading-[2] font-mono text-[14px]"
+            role="figure"
+            aria-labelledby="heatmap-label"
+          >
             {result.words.map((w, i) => (
               <Token
                 key={i}
@@ -169,9 +182,13 @@ function Token({
     <span
       onMouseEnter={onHover}
       onMouseLeave={onLeave}
-      role="mark"
-      aria-label={`${w.word}: ${w.bucket} signal, ${(w.score * 100).toFixed(0)}%. ${w.reason}`}
-      className="relative cursor-help rounded-[3px] px-[3px] py-[1px] mx-[0.5px] transition-colors"
+      onFocus={onHover}
+      onBlur={onLeave}
+      tabIndex={0}
+      role="button"
+      aria-label={`${w.word}: ${w.bucket} signal, ${(w.score * 100).toFixed(0)} percent. ${w.reason}`}
+      title={`${w.bucket} · ${(w.score * 100).toFixed(0)}% — ${w.reason}`}
+      className="relative cursor-help rounded-[3px] px-[3px] py-[1px] mx-[0.5px] transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-neon"
       style={{
         background: isHigh
           ? `rgba(180, 252, 74, ${bgAlpha})`

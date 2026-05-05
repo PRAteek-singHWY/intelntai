@@ -60,38 +60,54 @@ export default function ContextPruner() {
 
       <div className="grid grid-cols-1 lg:grid-cols-5 gap-5">
         <div className="card lg:col-span-3 p-5">
-          <div className="text-xs uppercase tracking-[0.18em] text-muted mb-2">
+          <label
+            htmlFor="pruner-question"
+            className="block text-xs uppercase tracking-[0.18em] text-muted mb-2"
+          >
             user question
-          </div>
+          </label>
           <input
+            id="pruner-question"
             value={question}
             onChange={(e) => setQuestion(e.target.value)}
-            className="w-full bg-surface-2 border border-border rounded-lg px-3 py-2 text-sm text-foreground focus:outline-none focus:border-neon"
+            className="w-full bg-surface-2 border border-border rounded-lg px-3 py-2 text-sm text-foreground focus:outline-none focus:border-neon focus-visible:ring-2 focus-visible:ring-neon"
           />
 
-          <div className="text-xs uppercase tracking-[0.18em] text-muted mt-5 mb-2">
+          <label
+            htmlFor="pruner-chunks"
+            className="block text-xs uppercase tracking-[0.18em] text-muted mt-5 mb-2"
+          >
             retrieved chunks · separate with blank line
-          </div>
+          </label>
           <textarea
+            id="pruner-chunks"
             value={chunksText}
             onChange={(e) => setChunksText(e.target.value)}
-            className="w-full min-h-[260px] bg-surface-2 border border-border rounded-lg p-3 text-sm font-mono text-foreground placeholder:text-muted-2 focus:outline-none focus:border-neon resize-y"
+            className="w-full min-h-[260px] bg-surface-2 border border-border rounded-lg p-3 text-sm font-mono text-foreground placeholder:text-muted-2 focus:outline-none focus:border-neon focus-visible:ring-2 focus-visible:ring-neon resize-y"
           />
         </div>
 
         <div className="card lg:col-span-2 p-5 space-y-5">
           <div>
-            <div className="text-xs uppercase tracking-[0.18em] text-muted mb-3">
+            <label
+              htmlFor="pruner-threshold"
+              className="block text-xs uppercase tracking-[0.18em] text-muted mb-3"
+            >
               relevance threshold
-            </div>
+            </label>
             <input
+              id="pruner-threshold"
               type="range"
               min={0}
               max={0.5}
               step={0.01}
               value={threshold}
+              aria-valuemin={0}
+              aria-valuemax={0.5}
+              aria-valuenow={threshold}
+              aria-valuetext={`${threshold.toFixed(2)} (${threshold < 0.15 ? "aggressive" : threshold > 0.35 ? "conservative" : "balanced"})`}
               onChange={(e) => setThreshold(parseFloat(e.target.value))}
-              className="w-full accent-[--neon]"
+              className="w-full accent-[--neon] focus-visible:ring-2 focus-visible:ring-neon rounded"
               style={{ accentColor: "var(--neon)" }}
             />
             <div className="flex justify-between text-xs text-muted-2 mt-1">
@@ -128,7 +144,7 @@ export default function ContextPruner() {
       {/* ranked chunks */}
       <div className="card p-5">
         <div className="flex items-center gap-2 mb-4">
-          <Filter className="w-4 h-4 text-neon" />
+          <Filter className="w-4 h-4 text-neon" aria-hidden="true" />
           <h4 className="font-semibold">Ranked chunks</h4>
         </div>
 
@@ -152,6 +168,7 @@ function ChunkRow({
 }) {
   const [open, setOpen] = useState(false);
   const pct = Math.round(c.score * 100);
+  const panelId = `chunk-panel-${c.index}`;
   return (
     <div
       className={`card-2 transition-colors ${
@@ -159,10 +176,17 @@ function ChunkRow({
       }`}
     >
       <button
+        type="button"
         onClick={() => setOpen((o) => !o)}
-        className="w-full flex items-center gap-3 px-4 py-3 text-left"
+        aria-expanded={open}
+        aria-controls={panelId}
+        aria-label={`${c.keep ? "Kept" : "Dropped"} chunk, ${pct}% relevance — ${open ? "collapse" : "expand"} details`}
+        className="w-full flex items-center gap-3 px-4 py-3 text-left focus:outline-none focus-visible:ring-2 focus-visible:ring-neon rounded-lg"
       >
-        <div className="w-8 h-8 rounded-full grid place-items-center shrink-0">
+        <div
+          className="w-8 h-8 rounded-full grid place-items-center shrink-0"
+          aria-hidden="true"
+        >
           {c.keep ? (
             <Check className="w-4 h-4 text-neon" />
           ) : (
@@ -212,19 +236,19 @@ function ChunkRow({
         </div>
 
         {open ? (
-          <ChevronUp className="w-4 h-4 text-muted ml-2" />
+          <ChevronUp className="w-4 h-4 text-muted ml-2" aria-hidden="true" />
         ) : (
-          <ChevronDown className="w-4 h-4 text-muted ml-2" />
+          <ChevronDown className="w-4 h-4 text-muted ml-2" aria-hidden="true" />
         )}
       </button>
 
       {open && (
-        <div className="px-4 pb-4 pt-0 text-sm text-muted">
+        <div id={panelId} className="px-4 pb-4 pt-0 text-sm text-muted">
           <div className="card-2 p-3 mb-2 text-foreground/90 whitespace-pre-wrap">
             {c.text}
           </div>
           <div className="flex items-start gap-2">
-            <Slash className="w-3 h-3 mt-1 text-muted-2 shrink-0" />
+            <Slash className="w-3 h-3 mt-1 text-muted-2 shrink-0" aria-hidden="true" />
             <span>{c.reason}</span>
           </div>
         </div>

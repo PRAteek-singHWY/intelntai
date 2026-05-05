@@ -6,7 +6,9 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "test": "node --test --experimental-strip-types --no-warnings 'src/lib/**/*.test.ts'"
+    "test": "node --test --experimental-strip-types --no-warnings 'src/lib/**/*.test.ts'",
+    "test:coverage": "node --test --experimental-strip-types --experimental-test-coverage --no-warnings 'src/lib/**/*.test.ts'",
+    "typecheck": "tsc --noEmit"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.93.0",

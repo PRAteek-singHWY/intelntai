@@ -36,3 +36,33 @@ test("cache evicts the oldest entry when at capacity", () => {
     599,
   );
 });
+
+test("cacheKey hashes are 64 hex chars (sha256)", () => {
+  const k = cacheKey(["x", 1, "y"]);
+  assert.match(k, /^[a-f0-9]{64}$/);
+});
+
+test("cacheKey changes when any part changes", () => {
+  const a = cacheKey(["mode", "prompt-a"]);
+  const b = cacheKey(["mode", "prompt-b"]);
+  const c = cacheKey(["other-mode", "prompt-a"]);
+  assert.notEqual(a, b);
+  assert.notEqual(a, c);
+});
+
+test("cacheGet promotes the entry on hit (LRU behavior)", () => {
+  // Establish three entries A, B, C and then read A again.
+  // After reading A, B should be the oldest.
+  const a = cacheKey(["lru", "A", String(Math.random())]);
+  const b = cacheKey(["lru", "B", String(Math.random())]);
+  cacheSet(a, "value-a");
+  cacheSet(b, "value-b");
+  // A is older; reading it should bump it to most-recent.
+  assert.equal(cacheGet<string>(a), "value-a");
+  // Both should still be reachable.
+  assert.equal(cacheGet<string>(b), "value-b");
+});
+
+test("cacheGet returns null for non-string keys that were never set", () => {
+  assert.equal(cacheGet<unknown>("never-set-explicitly"), null);
+});

@@ -26,7 +26,24 @@ export function inputCost(tokens: number, model: Model): number {
   return (tokens / 1_000_000) * model.inputPerM;
 }
 
+export function outputCost(tokens: number, model: Model): number {
+  return (tokens / 1_000_000) * model.outputPerM;
+}
+
+export function totalCost(
+  inputTokens: number,
+  outputTokens: number,
+  model: Model,
+): number {
+  return inputCost(inputTokens, model) + outputCost(outputTokens, model);
+}
+
+export function findModel(id: string): Model | undefined {
+  return MODELS.find((m) => m.id === id);
+}
+
 export function formatUSD(value: number): string {
+  if (!Number.isFinite(value)) return "$0";
   if (value === 0) return "$0";
   if (value < 0.0001) return `$${value.toExponential(2)}`;
   if (value < 0.01) return `$${value.toFixed(5)}`;

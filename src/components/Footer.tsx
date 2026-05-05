@@ -5,7 +5,7 @@ export default function Footer() {
     <footer className="border-t border-border mt-12 mesh-bg">
       <div className="max-w-7xl mx-auto px-6 py-10 flex flex-col md:flex-row items-center justify-between gap-4">
         <div className="flex items-center gap-2 text-sm text-muted">
-          <div className="w-6 h-6 rounded-md bg-gradient-to-br from-neon to-mid grid place-items-center">
+          <div className="w-6 h-6 rounded-md bg-gradient-to-br from-neon to-mid grid place-items-center" aria-hidden="true">
             <Sparkles className="w-3 h-3 text-deep" strokeWidth={3} />
           </div>
           <span className="text-foreground font-medium">Tokenly</span>

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   Wand2,
@@ -70,7 +70,7 @@ export default function Compressor() {
 
   const liveTokens = useMemo(() => countTokens(input), [input]);
 
-  const run = async () => {
+  const run = useCallback(async () => {
     if (!input.trim() || loading) return;
     setLoading(true);
     setError(null);
@@ -94,7 +94,7 @@ export default function Compressor() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [input, mode, loading]);
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -105,8 +105,7 @@ export default function Compressor() {
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [input, mode, loading]);
+  }, [run]);
 
   return (
     <section

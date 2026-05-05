@@ -85,17 +85,22 @@ export default function ModelArena() {
 
       <div className="grid grid-cols-1 lg:grid-cols-5 gap-5">
         <div className="card lg:col-span-3 p-5">
-          <div className="text-xs uppercase tracking-[0.18em] text-muted mb-2">
+          <label
+            htmlFor="arena-prompt"
+            className="block text-xs uppercase tracking-[0.18em] text-muted mb-2"
+          >
             prompt
-          </div>
+          </label>
           <textarea
+            id="arena-prompt"
             value={prompt}
             onChange={(e) => setPrompt(e.target.value)}
-            className="w-full min-h-[140px] bg-surface-2 border border-border rounded-lg p-3 text-sm font-mono text-foreground focus:outline-none focus:border-neon resize-y"
+            className="w-full min-h-[140px] bg-surface-2 border border-border rounded-lg p-3 text-sm font-mono text-foreground focus:outline-none focus:border-neon focus-visible:ring-2 focus-visible:ring-neon resize-y"
           />
 
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mt-4">
             <NumberInput
+              id="arena-output"
               label="output tokens / call"
               value={outputTokens}
               onChange={setOutputTokens}
@@ -104,6 +109,7 @@ export default function ModelArena() {
               step={50}
             />
             <NumberInput
+              id="arena-calls"
               label="calls / month"
               value={callsPerMonth}
               onChange={setCallsPerMonth}
@@ -112,20 +118,28 @@ export default function ModelArena() {
               step={10_000}
             />
             <div>
-              <div className="text-[10px] uppercase tracking-[0.18em] text-muted mb-1">
+              <label
+                htmlFor="arena-budget"
+                className="block text-[10px] uppercase tracking-[0.18em] text-muted mb-1"
+              >
                 budget / call
-              </div>
+              </label>
               <input
+                id="arena-budget"
                 type="range"
                 min={0.0001}
                 max={0.05}
                 step={0.0001}
                 value={budget}
+                aria-valuemin={0.0001}
+                aria-valuemax={0.05}
+                aria-valuenow={budget}
+                aria-valuetext={formatUSD(budget)}
                 onChange={(e) => setBudget(parseFloat(e.target.value))}
-                className="w-full"
+                className="w-full focus-visible:ring-2 focus-visible:ring-neon rounded"
                 style={{ accentColor: "var(--neon)" }}
               />
-              <div className="text-xs text-neon tabular mt-1">
+              <div className="text-xs text-neon tabular mt-1" aria-live="polite">
                 {formatUSD(budget)}
               </div>
             </div>
@@ -134,7 +148,7 @@ export default function ModelArena() {
 
         <div className="card lg:col-span-2 p-5">
           <div className="flex items-center gap-2 mb-3">
-            <Trophy className="w-4 h-4 text-neon" />
+            <Trophy className="w-4 h-4 text-neon" aria-hidden="true" />
             <div className="chip">recommended</div>
           </div>
           <div className="text-2xl font-semibold">{sweetSpot.label}</div>
@@ -156,7 +170,7 @@ export default function ModelArena() {
           </div>
 
           <div className="card-2 p-3 mt-4 text-xs text-muted leading-relaxed">
-            <Crosshair className="w-3 h-3 inline-block text-neon mr-1" />
+            <Crosshair className="w-3 h-3 inline-block text-neon mr-1" aria-hidden="true" />
             Sweet spot ranks models by{" "}
             <span className="text-foreground">
               (quality × 0.6 + speed × 0.4) ÷ cost
@@ -169,11 +183,20 @@ export default function ModelArena() {
       {/* arena table */}
       <div className="card p-5 overflow-hidden">
         <div className="flex items-center gap-2 mb-4">
-          <Gauge className="w-4 h-4 text-neon" />
-          <h4 className="font-semibold">All models · ranked by value</h4>
+          <Gauge className="w-4 h-4 text-neon" aria-hidden="true" />
+          <h4 className="font-semibold" id="arena-table-heading">
+            All models · ranked by value
+          </h4>
         </div>
         <div className="overflow-x-auto">
-          <table className="w-full text-sm min-w-[820px]">
+          <table
+            className="w-full text-sm min-w-[820px]"
+            aria-labelledby="arena-table-heading"
+          >
+            <caption className="sr-only">
+              Comparison of nine LLM providers ranked by value (quality and
+              speed weighted by cost), with budget eligibility indicated.
+            </caption>
             <thead>
               <tr className="text-muted text-xs uppercase tracking-[0.14em]">
                 <th className="text-left px-3 py-2 font-normal">Model</th>
@@ -254,6 +277,7 @@ function Bar({ value, color }: { value: number; color: "neon" | "light" }) {
 }
 
 function NumberInput({
+  id,
   label,
   value,
   onChange,
@@ -261,6 +285,7 @@ function NumberInput({
   max,
   step,
 }: {
+  id: string;
   label: string;
   value: number;
   onChange: (v: number) => void;
@@ -270,17 +295,21 @@ function NumberInput({
 }) {
   return (
     <div>
-      <div className="text-[10px] uppercase tracking-[0.18em] text-muted mb-1">
+      <label
+        htmlFor={id}
+        className="block text-[10px] uppercase tracking-[0.18em] text-muted mb-1"
+      >
         {label}
-      </div>
+      </label>
       <input
+        id={id}
         type="number"
         min={min}
         max={max}
         step={step}
         value={value}
         onChange={(e) => onChange(parseInt(e.target.value || "0", 10))}
-        className="w-full bg-surface-2 border border-border rounded-lg px-3 py-2 text-sm text-foreground focus:outline-none focus:border-neon tabular"
+        className="w-full bg-surface-2 border border-border rounded-lg px-3 py-2 text-sm text-foreground focus:outline-none focus:border-neon focus-visible:ring-2 focus-visible:ring-neon tabular"
       />
     </div>
   );

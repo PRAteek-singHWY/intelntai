@@ -53,11 +53,17 @@ export default function Hero() {
           transition={{ duration: 0.6, delay: 0.25 }}
           className="mt-10 flex flex-wrap gap-3 justify-center"
         >
-          <a href="#compressor" className="btn-primary inline-flex items-center gap-2">
+          <a
+            href="#compressor"
+            className="btn-primary inline-flex items-center gap-2 focus:outline-none focus-visible:ring-2 focus-visible:ring-neon"
+          >
             Try the live compressor
-            <ArrowDown className="w-4 h-4" />
+            <ArrowDown className="w-4 h-4" aria-hidden="true" />
           </a>
-          <a href="#how" className="btn-ghost inline-flex items-center gap-2">
+          <a
+            href="#how"
+            className="btn-ghost inline-flex items-center gap-2 focus:outline-none focus-visible:ring-2 focus-visible:ring-neon"
+          >
             See how it works
           </a>
         </motion.div>
@@ -110,7 +116,9 @@ function StatCard({
   return (
     <div className="card p-5 text-left">
       <div className="flex items-center gap-2 text-muted text-xs uppercase tracking-[0.18em]">
-        <span className="text-neon">{icon}</span>
+        <span className="text-neon" aria-hidden="true">
+          {icon}
+        </span>
         {label}
       </div>
       <div className="mt-3 text-4xl font-semibold text-foreground">

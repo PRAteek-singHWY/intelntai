@@ -81,7 +81,7 @@ export default function HowItWorks() {
             >
               <div className="flex items-center justify-between mb-4">
                 <div className="w-9 h-9 rounded-lg grid place-items-center bg-neon-soft border border-neon/25">
-                  <Icon className="w-4 h-4 text-neon" />
+                  <Icon className="w-4 h-4 text-neon" aria-hidden="true" />
                 </div>
                 <span className="text-[10px] uppercase tracking-[0.18em] text-muted-2">
                   stage {i + 1}
@@ -92,7 +92,10 @@ export default function HowItWorks() {
                 {s.body}
               </p>
               {i < STAGES.length - 1 && (
-                <ArrowRight className="absolute right-[-12px] top-1/2 -translate-y-1/2 w-5 h-5 text-neon hidden md:block" />
+                <ArrowRight
+                  aria-hidden="true"
+                  className="absolute right-[-12px] top-1/2 -translate-y-1/2 w-5 h-5 text-neon hidden md:block"
+                />
               )}
             </motion.div>
           );
@@ -104,7 +107,7 @@ export default function HowItWorks() {
           const Icon = p.icon;
           return (
             <div key={p.title} className="card p-6">
-              <Icon className="w-5 h-5 text-neon mb-3" />
+              <Icon className="w-5 h-5 text-neon mb-3" aria-hidden="true" />
               <h3 className="font-semibold text-foreground">{p.title}</h3>
               <p className="text-sm text-muted mt-1 leading-relaxed">
                 {p.body}

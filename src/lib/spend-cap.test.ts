@@ -28,3 +28,21 @@ test("spendStats reports the configured cap", () => {
   assert.equal(typeof stats.day, "string");
   assert.match(stats.day, /^\d{4}-\d{2}-\d{2}$/);
 });
+
+test("spendRemaining is non-negative even after large spend", () => {
+  // Force a huge spend; remaining should clamp to 0, not go negative.
+  recordSpend(50_000_000, 50_000_000);
+  assert.ok(spendRemaining() >= 0);
+});
+
+test("spendStats day field matches today's UTC date", () => {
+  const today = new Date().toISOString().slice(0, 10);
+  assert.equal(spendStats().day, today);
+});
+
+test("spendAllowed flips false once the cap is exceeded", () => {
+  // Continue from the prior test — usdSpent should already be over the cap.
+  // Add more just in case the env override pushed the cap up.
+  recordSpend(50_000_000, 50_000_000);
+  assert.equal(spendAllowed(), false);
+});

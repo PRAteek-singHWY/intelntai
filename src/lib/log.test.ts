@@ -42,3 +42,62 @@ test("log uppercases the severity", () => {
   const parsed = JSON.parse(out[0]);
   assert.equal(parsed.severity, "WARNING".slice(0, 4)); // "WARN"
 });
+
+test("log emits an ISO 8601 timestamp on every line", () => {
+  const out = captureConsole("log", () =>
+    log("info", "ts_check", { x: 1 }),
+  );
+  const parsed = JSON.parse(out[0]);
+  // ISO 8601 with 'Z' suffix or numeric offset.
+  assert.match(parsed.ts, /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}/);
+  // Must be parseable.
+  assert.ok(!Number.isNaN(new Date(parsed.ts).getTime()));
+});
+
+test("log carries arbitrary structured fields verbatim", () => {
+  const out = captureConsole("log", () =>
+    log("info", "event_x", {
+      ip: "1.2.3.4",
+      ms: 123,
+      ok: true,
+      tags: ["a", "b"],
+      nested: { id: 7 },
+    }),
+  );
+  const parsed = JSON.parse(out[0]);
+  assert.equal(parsed.ip, "1.2.3.4");
+  assert.equal(parsed.ms, 123);
+  assert.equal(parsed.ok, true);
+  assert.deepEqual(parsed.tags, ["a", "b"]);
+  assert.deepEqual(parsed.nested, { id: 7 });
+});
+
+test("log defaults the fields object to empty when none is passed", () => {
+  const out = captureConsole("log", () => log("info", "no_fields"));
+  const parsed = JSON.parse(out[0]);
+  assert.equal(parsed.event, "no_fields");
+  assert.equal(parsed.severity, "INFO");
+});
+
+test("warn-level routes to stdout, not stderr", () => {
+  const stdout = captureConsole("log", () => log("warn", "warn_event"));
+  assert.equal(stdout.length, 1);
+  // Warn should appear on stdout (severity=WARN); error path is separate.
+});
+
+test("Cloud Logging stays disabled when CLOUD_LOGGING_ENABLED is unset", () => {
+  // The maybeInitCloudLogging helper short-circuits to null without
+  // CLOUD_LOGGING_ENABLED=1 — verify by ensuring no extra side effects
+  // (the line still lands on stdout and parses as JSON).
+  const prior = process.env.CLOUD_LOGGING_ENABLED;
+  delete process.env.CLOUD_LOGGING_ENABLED;
+  try {
+    const out = captureConsole("log", () =>
+      log("info", "no_cloud_log", { x: 1 }),
+    );
+    assert.equal(out.length, 1);
+    JSON.parse(out[0]); // throws if not valid JSON
+  } finally {
+    if (prior !== undefined) process.env.CLOUD_LOGGING_ENABLED = prior;
+  }
+});

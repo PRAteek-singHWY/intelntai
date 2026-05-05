@@ -81,3 +81,69 @@ test("stats reflect categories", () => {
   assert.ok(r.stats.removedCount + r.stats.rewrittenCount > 0);
   assert.ok(r.stats.byCategory.politeness >= 1);
 });
+
+test("empty input returns the empty result without crashing", () => {
+  const r = compressRuleBased("");
+  assert.equal(r.compressed, "");
+  assert.equal(r.original, "");
+  assert.deepEqual(r.segments, []);
+  assert.equal(r.stats.removedCount, 0);
+  assert.equal(r.stats.rewrittenCount, 0);
+  assert.equal(r.stats.byCategory.politeness, 0);
+  assert.equal(r.stats.byCategory.duplicate, 0);
+});
+
+test("whitespace-only input returns the empty result", () => {
+  const r = compressRuleBased("   \n\n   \t");
+  assert.equal(r.compressed, "");
+});
+
+test("duplicate sentence detection runs without crashing on empty/short input", () => {
+  // The dedup pass has internal length thresholds — make sure it handles
+  // edge cases (very short text, single sentence) without throwing.
+  for (const input of ["a.", "Hi.", "One sentence here."]) {
+    const r = compressRuleBased(input);
+    assert.equal(typeof r.stats.byCategory.duplicate, "number");
+  }
+});
+
+test("repeated sentences after preamble removal get marked duplicate", () => {
+  // After "I would like you to " is stripped by the meta pattern, two copies
+  // of the trailing sentence end up as standalone segments — at which point
+  // the dedup pass can mark the second one as a duplicate.
+  const r = compressRuleBased(
+    "I would like you to summarize the document. I would like you to summarize the document.",
+  );
+  assert.ok(
+    r.stats.byCategory.duplicate >= 1,
+    `expected duplicate >=1, got ${r.stats.byCategory.duplicate}. compressed: ${r.compressed}`,
+  );
+});
+
+test("collapses runs of internal whitespace and trims the edges", () => {
+  const r = compressRuleBased("  hello   world.  \n\n\n\nNext line.   ");
+  // Should not start or end with whitespace and should not contain runs of >2 spaces.
+  assert.equal(r.compressed, r.compressed.trim());
+  assert.ok(!/[ \t]{2,}/.test(r.compressed));
+  assert.ok(!/\n{3,}/.test(r.compressed));
+});
+
+test("segments are an ordered partition of the original", () => {
+  const original =
+    "Please summarize. In order to be helpful, kindly include all numbers.";
+  const r = compressRuleBased(original);
+  // Reconstructing kept + removed + (rewritten as `text`) should equal the
+  // original (this is how the UI renders the diff).
+  const rebuilt = r.segments
+    .map((s) => (s.kind === "rewritten" ? s.text : s.text))
+    .join("");
+  assert.equal(rebuilt, original);
+});
+
+test("preserves code blocks, URLs, and identifiers", () => {
+  const r = compressRuleBased(
+    "Please call api.example.com/v1 and use function fooBar() to please log it.",
+  );
+  assert.ok(r.compressed.includes("api.example.com/v1"));
+  assert.ok(r.compressed.includes("fooBar()"));
+});

@@ -28,3 +28,25 @@ test("approxTokens with no provider equals countTokens", () => {
   const t = "the quick brown fox jumps over the lazy dog";
   assert.equal(approxTokens(t), countTokens(t));
 });
+
+test("approxTokens with DeepSeek scalar equals base count", () => {
+  const t = "deepseek tokenizer is roughly equivalent in our model";
+  assert.equal(approxTokens(t, "DeepSeek"), countTokens(t));
+});
+
+test("approxTokens with an unknown provider falls through to base", () => {
+  const t = "an unknown provider should not crash the function";
+  assert.equal(approxTokens(t, "Unknown" as never), countTokens(t));
+});
+
+test("countTokens is deterministic for the same input", () => {
+  const t = "Compression preserves intent.";
+  assert.equal(countTokens(t), countTokens(t));
+});
+
+test("countTokens handles unicode and emoji", () => {
+  // gpt-tokenizer should not throw on non-ASCII content.
+  const t = "Compress 日本語 prompts and emoji 🎯 too.";
+  const n = countTokens(t);
+  assert.ok(n > 0);
+});

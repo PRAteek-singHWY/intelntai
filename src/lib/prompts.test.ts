@@ -44,3 +44,34 @@ test("parseCompressionJson tolerates non-array notes field", () => {
   const out = parseCompressionJson('{"compressed":"a","notes":"oops"}');
   assert.deepEqual(out.notes, []);
 });
+
+test("parseCompressionJson handles whitespace-padded fenced JSON", () => {
+  const out = parseCompressionJson(
+    '\n\n   ```json\n{"compressed":"clean","notes":["a"]}\n```   \n\n',
+  );
+  assert.equal(out.compressed, "clean");
+  assert.deepEqual(out.notes, ["a"]);
+});
+
+test("parseCompressionJson preserves multi-line compressed strings", () => {
+  const out = parseCompressionJson(
+    '{"compressed":"line1\\nline2","notes":["multi"]}',
+  );
+  assert.equal(out.compressed, "line1\nline2");
+});
+
+test("parseCompressionJson keeps a long notes array as-is", () => {
+  const notes = ["a", "b", "c", "d", "e", "f"];
+  const out = parseCompressionJson(
+    JSON.stringify({ compressed: "x", notes }),
+  );
+  assert.deepEqual(out.notes, notes);
+});
+
+test("COMPRESSION_SYSTEM_PROMPT mentions the preserve constraints", () => {
+  // These are the load-bearing rules — if they get edited out, prompts
+  // will start losing entities/code on the AI path.
+  assert.match(COMPRESSION_SYSTEM_PROMPT, /entities/i);
+  assert.match(COMPRESSION_SYSTEM_PROMPT, /numeric|number/i);
+  assert.match(COMPRESSION_SYSTEM_PROMPT, /code/i);
+});

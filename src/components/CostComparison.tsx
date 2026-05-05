@@ -34,15 +34,23 @@ export default function CostComparison({ tokensBefore, tokensAfter }: Props) {
           <div className="text-xs uppercase tracking-[0.18em] text-muted">
             total saved across models
           </div>
-          <div className="text-3xl font-semibold text-neon mt-1 tabular flex items-center gap-2 justify-end">
-            <TrendingDown className="w-5 h-5" />
+          <div
+            className="text-3xl font-semibold text-neon mt-1 tabular flex items-center gap-2 justify-end"
+            aria-live="polite"
+          >
+            <TrendingDown className="w-5 h-5" aria-hidden="true" />
             {formatUSD(totalSavings)}
           </div>
         </div>
       </div>
 
       <div className="overflow-hidden rounded-lg border border-border">
-        <table className="w-full text-sm">
+        <table className="w-full text-sm" aria-label="Per-call cost and savings across LLM providers">
+          <caption className="sr-only">
+            Per-call input cost before and after compression for nine major
+            LLMs, with projected savings at one million calls and percentage
+            reduction.
+          </caption>
           <thead>
             <tr className="bg-surface-2 text-muted text-xs uppercase tracking-[0.14em]">
               <th className="text-left px-4 py-3 font-normal">Model</th>
