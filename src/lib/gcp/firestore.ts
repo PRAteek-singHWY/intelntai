@@ -51,11 +51,26 @@ const COLLECTION = "compressions";
 
 export async function logCompression(record: CompressionRecord): Promise<void> {
   const store = getDb();
-  if (!store) return;
+  if (!store) {
+    console.log(
+      JSON.stringify({
+        severity: "INFO",
+        event: "firestore_skipped",
+        reason: "no project / db unavailable",
+      }),
+    );
+    return;
+  }
   try {
     await store.collection(COLLECTION).add({ ...record, ts: new Date() });
-  } catch {
-    // Swallow errors — observability must never break the request.
+  } catch (err) {
+    console.error(
+      JSON.stringify({
+        severity: "ERROR",
+        event: "firestore_write_failed",
+        error: err instanceof Error ? err.message : String(err),
+      }),
+    );
   }
 }
 
