@@ -4,6 +4,7 @@
 // using Application Default Credentials (the runtime service account).
 
 import { SecretManagerServiceClient } from "@google-cloud/secret-manager";
+import { projectId } from "./env.ts";
 
 let client: SecretManagerServiceClient | null = null;
 const cache = new Map<string, string>();
@@ -11,15 +12,6 @@ const cache = new Map<string, string>();
 function getClient(): SecretManagerServiceClient {
   if (!client) client = new SecretManagerServiceClient();
   return client;
-}
-
-function projectId(): string | null {
-  return (
-    process.env.GOOGLE_CLOUD_PROJECT ||
-    process.env.GCP_PROJECT ||
-    process.env.GCLOUD_PROJECT ||
-    null
-  );
 }
 
 export async function getSecret(name: string): Promise<string | null> {

@@ -9,18 +9,13 @@ import { getAnthropicKey } from "@/lib/gcp/secrets";
 import { geminiCompress, geminiAvailable } from "@/lib/gcp/gemini";
 import { logCompression } from "@/lib/gcp/firestore";
 import { countTokens } from "@/lib/tokenizer";
+import { COMPRESSION_SYSTEM_PROMPT, parseCompressionJson } from "@/lib/prompts";
+import { validateBody, type Mode } from "@/lib/validation";
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
 
-type Mode = "rules" | "ai" | "gemini" | "both" | "all";
-
-type Body = {
-  prompt: string;
-  mode?: Mode;
-};
-
-type AiResult = { compressed: string; notes: string[] };
+export type AiResult = { compressed: string; notes: string[] };
 
 type Response = {
   rules: CompressResult;
@@ -31,23 +26,7 @@ type Response = {
   cache?: "hit" | "miss";
 };
 
-const SYSTEM_PROMPT = `You are a prompt compression engine. Your only job is to rewrite the user's prompt to use FEWER tokens while preserving 100% of the semantic intent, all named entities, all numeric values, and all formatting requirements.
-
-Rules:
-- Strip filler words, politeness, conversational preamble.
-- Replace verbose phrases with shorter equivalents.
-- Merge redundant instructions.
-- Remove duplicate sentences.
-- Never add new instructions.
-- Never remove technical specs, constraints, or examples that carry signal.
-- Preserve code blocks verbatim.
-
-Return strict JSON of the form:
-{
-  "compressed": "the rewritten prompt",
-  "notes": ["short bullet describing each meaningful cut, max 6 bullets"]
-}
-No prose outside the JSON. No markdown fences.`;
+// --- Claude path -------------------------------------------------------
 
 async function aiCompress(prompt: string): Promise<AiResult> {
   const apiKey = await getAnthropicKey();
@@ -57,7 +36,7 @@ async function aiCompress(prompt: string): Promise<AiResult> {
   const msg = await client.messages.create({
     model: "claude-sonnet-4-6",
     max_tokens: 2048,
-    system: SYSTEM_PROMPT,
+    system: COMPRESSION_SYSTEM_PROMPT,
     messages: [{ role: "user", content: prompt }],
   });
 
@@ -68,18 +47,70 @@ async function aiCompress(prompt: string): Promise<AiResult> {
     .map((b) => b.text)
     .join("");
 
-  const cleaned = text.trim().replace(/^```(?:json)?\s*/i, "").replace(/```\s*$/i, "");
-  let parsed: { compressed: string; notes?: string[] };
-  try {
-    parsed = JSON.parse(cleaned);
-  } catch {
-    return { compressed: cleaned, notes: [] };
-  }
-  return {
-    compressed: parsed.compressed ?? "",
-    notes: Array.isArray(parsed.notes) ? parsed.notes : [],
-  };
+  return parseCompressionJson(text);
 }
+
+type EngineOutcome =
+  | { result: AiResult; cache: "hit" | "miss" }
+  | { error: string };
+
+async function runClaude(prompt: string, ip: string, mode: Mode): Promise<EngineOutcome> {
+  const key = cacheKey(["ai", prompt]);
+  const cached = cacheGet<AiResult>(key);
+  if (cached) {
+    log("info", "compress", { ip, mode, cache: "hit", chars: prompt.length });
+    return { result: cached, cache: "hit" };
+  }
+  if (!spendAllowed()) {
+    log("warn", "spend_cap_hit", { ip, ...spendStats() });
+    return { error: "Daily AI budget exhausted — try again tomorrow or use rules mode." };
+  }
+  try {
+    const ai = await aiCompress(prompt);
+    cacheSet(key, ai);
+    log("info", "compress", {
+      ip,
+      mode,
+      cache: "miss",
+      chars: prompt.length,
+      ...spendStats(),
+    });
+    return { result: ai, cache: "miss" };
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : "AI compression failed";
+    log("error", "ai_compress_failed", { ip, error: msg });
+    return { error: msg };
+  }
+}
+
+// --- Gemini path -------------------------------------------------------
+
+async function runGemini(prompt: string, ip: string, mode: Mode): Promise<EngineOutcome> {
+  if (!geminiAvailable()) {
+    return {
+      error:
+        "Gemini not configured — set GOOGLE_CLOUD_PROJECT (Vertex AI) or GEMINI_API_KEY.",
+    };
+  }
+  const key = cacheKey(["gemini", prompt]);
+  const cached = cacheGet<AiResult>(key);
+  if (cached) {
+    log("info", "gemini_compress", { ip, mode, cache: "hit" });
+    return { result: cached, cache: "hit" };
+  }
+  try {
+    const g = await geminiCompress(prompt);
+    cacheSet(key, g);
+    log("info", "gemini_compress", { ip, mode, cache: "miss" });
+    return { result: g, cache: "miss" };
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : "Gemini compression failed";
+    log("error", "gemini_compress_failed", { ip, error: msg });
+    return { error: msg };
+  }
+}
+
+// --- Handler -----------------------------------------------------------
 
 export async function POST(req: NextRequest) {
   const ip = clientIp(req.headers);
@@ -98,22 +129,19 @@ export async function POST(req: NextRequest) {
     );
   }
 
-  let body: Body;
+  let raw: unknown;
   try {
-    body = (await req.json()) as Body;
+    raw = await req.json();
   } catch {
     return NextResponse.json({ error: "Invalid JSON body" }, { status: 400 });
   }
 
-  const prompt = (body.prompt ?? "").toString();
-  if (!prompt.trim()) {
-    return NextResponse.json({ error: "Prompt is empty" }, { status: 400 });
+  const validated = validateBody(raw);
+  if ("error" in validated) {
+    return NextResponse.json({ error: validated.error }, { status: validated.status });
   }
-  if (prompt.length > 50_000) {
-    return NextResponse.json({ error: "Prompt too large (>50k chars)" }, { status: 413 });
-  }
+  const { prompt, mode } = validated;
 
-  const mode: Mode = body.mode ?? "rules";
   const rules = compressRuleBased(prompt);
   const response: Response = { rules };
   const headers: Record<string, string> = {
@@ -124,64 +152,24 @@ export async function POST(req: NextRequest) {
   const wantsGemini = mode === "gemini" || mode === "all";
 
   if (wantsClaude) {
-    const key = cacheKey(["ai", prompt]);
-    const cached = cacheGet<AiResult>(key);
-
-    if (cached) {
-      response.ai = cached;
-      response.cache = "hit";
-      headers["X-Cache"] = "HIT";
-      log("info", "compress", { ip, mode, cache: "hit", chars: prompt.length });
-    } else if (!spendAllowed()) {
+    const outcome = await runClaude(prompt, ip, mode);
+    if ("error" in outcome) {
       response.ai = null;
-      response.aiError = "Daily AI budget exhausted — try again tomorrow or use rules mode.";
-      log("warn", "spend_cap_hit", { ip, ...spendStats() });
+      response.aiError = outcome.error;
     } else {
-      try {
-        const ai = await aiCompress(prompt);
-        cacheSet(key, ai);
-        response.ai = ai;
-        response.cache = "miss";
-        headers["X-Cache"] = "MISS";
-        log("info", "compress", {
-          ip,
-          mode,
-          cache: "miss",
-          chars: prompt.length,
-          ...spendStats(),
-        });
-      } catch (err) {
-        response.ai = null;
-        response.aiError = err instanceof Error ? err.message : "AI compression failed";
-        log("error", "ai_compress_failed", { ip, error: response.aiError });
-      }
+      response.ai = outcome.result;
+      response.cache = outcome.cache;
+      headers["X-Cache"] = outcome.cache === "hit" ? "HIT" : "MISS";
     }
   }
 
   if (wantsGemini) {
-    if (!geminiAvailable()) {
+    const outcome = await runGemini(prompt, ip, mode);
+    if ("error" in outcome) {
       response.gemini = null;
-      response.geminiError =
-        "Gemini not configured — set GOOGLE_CLOUD_PROJECT (Vertex AI) or GEMINI_API_KEY.";
+      response.geminiError = outcome.error;
     } else {
-      const gKey = cacheKey(["gemini", prompt]);
-      const gCached = cacheGet<AiResult>(gKey);
-      if (gCached) {
-        response.gemini = gCached;
-        log("info", "gemini_compress", { ip, mode, cache: "hit" });
-      } else {
-        try {
-          const g = await geminiCompress(prompt);
-          cacheSet(gKey, g);
-          response.gemini = g;
-          log("info", "gemini_compress", { ip, mode, cache: "miss" });
-        } catch (err) {
-          response.gemini = null;
-          response.geminiError =
-            err instanceof Error ? err.message : "Gemini compression failed";
-          log("error", "gemini_compress_failed", { ip, error: response.geminiError });
-        }
-      }
+      response.gemini = outcome.result;
     }
   }
 

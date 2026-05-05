@@ -3,18 +3,10 @@
 // no-op when GCP creds are unavailable (e.g., local dev without ADC).
 
 import { Firestore } from "@google-cloud/firestore";
+import { projectId } from "./env.ts";
 
 let db: Firestore | null = null;
 let disabled = false;
-
-function projectId(): string | null {
-  return (
-    process.env.GOOGLE_CLOUD_PROJECT ||
-    process.env.GCP_PROJECT ||
-    process.env.GCLOUD_PROJECT ||
-    null
-  );
-}
 
 function getDb(): Firestore | null {
   if (disabled) return null;
