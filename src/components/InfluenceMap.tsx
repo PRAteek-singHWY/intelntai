@@ -157,16 +157,20 @@ function Token({
     );
   }
 
-  // Map score to color: high → neon, mid → light, low → dim muted
+  // Map score to color + weight + underline thickness so the channel is not
+  // color-only (a11y: colorblind users still get scale via weight + decoration).
   const intensity = Math.max(0.08, Math.min(1, w.score));
   const bgAlpha = intensity * 0.65;
   const isHigh = w.bucket === "high";
   const isLow = w.bucket === "low";
+  const underlineThickness = isHigh ? Math.max(1, Math.round(intensity * 3)) : 0;
 
   return (
     <span
       onMouseEnter={onHover}
       onMouseLeave={onLeave}
+      role="mark"
+      aria-label={`${w.word}: ${w.bucket} signal, ${(w.score * 100).toFixed(0)}%. ${w.reason}`}
       className="relative cursor-help rounded-[3px] px-[3px] py-[1px] mx-[0.5px] transition-colors"
       style={{
         background: isHigh
@@ -175,7 +179,16 @@ function Token({
           ? "rgba(125, 125, 125, 0.08)"
           : `rgba(217, 249, 157, ${bgAlpha * 0.55})`,
         color: isHigh ? "#04080a" : isLow ? "var(--muted-2)" : "var(--foreground)",
-        fontWeight: isHigh ? 600 : 400,
+        fontWeight: isHigh ? 700 : isLow ? 300 : 500,
+        fontStyle: isLow ? "italic" : "normal",
+        textDecoration: isHigh
+          ? "underline"
+          : isLow
+          ? "line-through"
+          : "none",
+        textDecorationThickness: isHigh ? `${underlineThickness}px` : isLow ? "1px" : undefined,
+        textDecorationColor: isHigh ? "rgba(4,8,10,0.55)" : isLow ? "rgba(125,125,125,0.4)" : undefined,
+        textUnderlineOffset: isHigh ? "3px" : undefined,
         boxShadow: isHigh
           ? `0 0 ${Math.round(intensity * 14)}px rgba(180,252,74,${intensity * 0.35})`
           : "none",
@@ -216,8 +229,12 @@ function Legend() {
         />
       </div>
       <div className="flex justify-between text-[10px] text-muted-2 mt-1.5 uppercase tracking-[0.16em]">
-        <span>noise</span>
-        <span>signal</span>
+        <span><span className="line-through italic">noise</span></span>
+        <span><span className="underline font-bold">signal</span></span>
+      </div>
+      <div className="text-[10px] text-muted-2 mt-2 leading-relaxed">
+        Color, weight & underline all encode score so the heatmap stays readable
+        without relying on hue.
       </div>
     </div>
   );

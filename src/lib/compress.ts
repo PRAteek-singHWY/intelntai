@@ -88,7 +88,7 @@ const PATTERNS: Pattern[] = [
   { regex: /\bif you don't mind,?\s*/gi, replacement: "", category: "politeness", reason: 'social filler' },
   { regex: /\bif you would,?\s*/gi, replacement: "", category: "politeness", reason: 'social filler' },
   { regex: /\bI would appreciate it if (you would\s+)?/gi, replacement: "", category: "politeness", reason: 'social filler' },
-  { regex: /\bthank you(\s+in\s+advance)?(\s+for\s+(your\s+)?(help|time|assistance|cooperation|patience))?\s*\.?/gi, replacement: "", category: "politeness", reason: 'closing pleasantry' },
+  { regex: /,?\s*\b(thank you|thanks)(\s+in\s+advance)?(\s+for\s+(your\s+)?(help|time|assistance|cooperation|patience))?\s*[.!]?/gi, replacement: "", category: "politeness", reason: 'closing pleasantry' },
   { regex: /\bin advance\.?\s*$/gi, replacement: "", category: "politeness", reason: 'orphan "in advance"' },
 
   // --- Filler intensifiers --------------------------------------------

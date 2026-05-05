@@ -1,6 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
 import Anthropic from "@anthropic-ai/sdk";
 import { compressRuleBased, type CompressResult } from "@/lib/compress";
+import { rateLimit, clientIp } from "@/lib/rate-limit";
+import { cacheGet, cacheSet, cacheKey } from "@/lib/cache";
+import { spendAllowed, recordSpend, spendStats } from "@/lib/spend-cap";
+import { log } from "@/lib/log";
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
@@ -10,13 +14,13 @@ type Body = {
   mode?: "rules" | "ai" | "both";
 };
 
+type AiResult = { compressed: string; notes: string[] };
+
 type Response = {
   rules: CompressResult;
-  ai?: {
-    compressed: string;
-    notes: string[];
-  } | null;
+  ai?: AiResult | null;
   aiError?: string;
+  cache?: "hit" | "miss";
 };
 
 const SYSTEM_PROMPT = `You are a prompt compression engine. Your only job is to rewrite the user's prompt to use FEWER tokens while preserving 100% of the semantic intent, all named entities, all numeric values, and all formatting requirements.
@@ -37,7 +41,7 @@ Return strict JSON of the form:
 }
 No prose outside the JSON. No markdown fences.`;
 
-async function aiCompress(prompt: string): Promise<{ compressed: string; notes: string[] }> {
+async function aiCompress(prompt: string): Promise<AiResult> {
   const apiKey = process.env.ANTHROPIC_API_KEY;
   if (!apiKey) throw new Error("ANTHROPIC_API_KEY not configured");
 
@@ -49,18 +53,18 @@ async function aiCompress(prompt: string): Promise<{ compressed: string; notes: 
     messages: [{ role: "user", content: prompt }],
   });
 
+  recordSpend(msg.usage.input_tokens, msg.usage.output_tokens);
+
   const text = msg.content
     .filter((block): block is Anthropic.TextBlock => block.type === "text")
     .map((b) => b.text)
     .join("");
 
-  // The model sometimes wraps JSON in fences anyway — strip them.
   const cleaned = text.trim().replace(/^```(?:json)?\s*/i, "").replace(/```\s*$/i, "");
   let parsed: { compressed: string; notes?: string[] };
   try {
     parsed = JSON.parse(cleaned);
   } catch {
-    // Fall back: treat entire response as the compressed text.
     return { compressed: cleaned, notes: [] };
   }
   return {
@@ -70,6 +74,22 @@ async function aiCompress(prompt: string): Promise<{ compressed: string; notes: 
 }
 
 export async function POST(req: NextRequest) {
+  const ip = clientIp(req.headers);
+  const limit = rateLimit(ip);
+  if (!limit.ok) {
+    log("warn", "rate_limited", { ip, retryAfterSec: limit.retryAfterSec });
+    return NextResponse.json(
+      { error: "Rate limit exceeded — slow down." },
+      {
+        status: 429,
+        headers: {
+          "Retry-After": String(limit.retryAfterSec),
+          "X-RateLimit-Remaining": "0",
+        },
+      },
+    );
+  }
+
   let body: Body;
   try {
     body = (await req.json()) as Body;
@@ -87,18 +107,47 @@ export async function POST(req: NextRequest) {
 
   const mode = body.mode ?? "rules";
   const rules = compressRuleBased(prompt);
-
   const response: Response = { rules };
+  const headers: Record<string, string> = {
+    "X-RateLimit-Remaining": String(limit.remaining),
+  };
 
   if (mode === "ai" || mode === "both") {
-    try {
-      response.ai = await aiCompress(prompt);
-    } catch (err) {
+    const key = cacheKey(["ai", prompt]);
+    const cached = cacheGet<AiResult>(key);
+
+    if (cached) {
+      response.ai = cached;
+      response.cache = "hit";
+      headers["X-Cache"] = "HIT";
+      log("info", "compress", { ip, mode, cache: "hit", chars: prompt.length });
+    } else if (!spendAllowed()) {
       response.ai = null;
-      response.aiError =
-        err instanceof Error ? err.message : "AI compression failed";
+      response.aiError = "Daily AI budget exhausted — try again tomorrow or use rules mode.";
+      log("warn", "spend_cap_hit", { ip, ...spendStats() });
+    } else {
+      try {
+        const ai = await aiCompress(prompt);
+        cacheSet(key, ai);
+        response.ai = ai;
+        response.cache = "miss";
+        headers["X-Cache"] = "MISS";
+        log("info", "compress", {
+          ip,
+          mode,
+          cache: "miss",
+          chars: prompt.length,
+          ...spendStats(),
+        });
+      } catch (err) {
+        response.ai = null;
+        response.aiError = err instanceof Error ? err.message : "AI compression failed";
+        log("error", "ai_compress_failed", { ip, error: response.aiError });
+      }
     }
+  } else {
+    log("info", "compress", { ip, mode, chars: prompt.length });
   }
 
-  return NextResponse.json(response);
+  return NextResponse.json(response, { headers });
 }

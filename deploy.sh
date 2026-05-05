@@ -49,7 +49,7 @@ gcloud run deploy "$SERVICE" \
   --timeout 60 \
   --max-instances 10 \
   "$AUTH_FLAG" \
-  "${ENV_ARGS[@]}"
+  ${ENV_ARGS[@]+"${ENV_ARGS[@]}"}
 
 echo
 echo "✅  Deployed. Public URL:"
