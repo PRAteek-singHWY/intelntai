@@ -64,11 +64,20 @@ export async function logCompression(record: CompressionRecord): Promise<void> {
   try {
     await store.collection(COLLECTION).add({ ...record, ts: new Date() });
   } catch (err) {
+    const e = err as {
+      code?: number;
+      details?: string;
+      message?: string;
+      stack?: string;
+    };
     console.error(
       JSON.stringify({
         severity: "ERROR",
         event: "firestore_write_failed",
-        error: err instanceof Error ? err.message : String(err),
+        code: e.code,
+        details: e.details,
+        message: e.message,
+        stack: e.stack?.split("\n").slice(0, 3).join(" | "),
       }),
     );
   }
