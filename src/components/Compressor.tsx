@@ -12,6 +12,7 @@ import {
   Sparkles,
   TrendingDown,
   AlertCircle,
+  Globe,
 } from "lucide-react";
 
 import type { CompressResult } from "@/lib/compress";
@@ -49,12 +50,14 @@ Code:
   },
 ];
 
-type Mode = "rules" | "ai" | "both";
+type Mode = "rules" | "ai" | "gemini" | "both" | "all";
 
 type ApiResponse = {
   rules: CompressResult;
   ai?: { compressed: string; notes: string[] } | null;
+  gemini?: { compressed: string; notes: string[] } | null;
   aiError?: string;
+  geminiError?: string;
 };
 
 export default function Compressor() {
@@ -140,18 +143,25 @@ export default function Compressor() {
               </span>
             </div>
             <button
+              type="button"
               onClick={() => setInput("")}
-              className="text-xs text-muted hover:text-neon transition-colors inline-flex items-center gap-1.5"
+              aria-label="Clear input prompt"
+              className="text-xs text-muted hover:text-neon transition-colors inline-flex items-center gap-1.5 focus:outline-none focus-visible:ring-2 focus-visible:ring-neon rounded"
             >
-              <RotateCcw className="w-3 h-3" />
+              <RotateCcw className="w-3 h-3" aria-hidden="true" />
               clear
             </button>
           </div>
 
+          <label htmlFor="compressor-input" className="sr-only">
+            Prompt to compress
+          </label>
           <textarea
+            id="compressor-input"
             value={input}
             onChange={(e) => setInput(e.target.value)}
             placeholder="Paste a system prompt, RAG instruction template, or any prompt with bloat…"
+            aria-label="Prompt to compress"
             className="flex-1 min-h-[280px] w-full bg-surface-2 border border-border rounded-lg p-4 text-sm font-mono text-foreground placeholder:text-muted-2 focus:outline-none focus:border-neon focus:ring-1 focus:ring-neon resize-y"
           />
 
@@ -181,21 +191,37 @@ export default function Compressor() {
                 desc="instant"
                 active={mode === "rules"}
                 onClick={() => setMode("rules")}
-                icon={<Wand2 className="w-3.5 h-3.5" />}
+                icon={<Wand2 className="w-3.5 h-3.5" aria-hidden="true" />}
               />
               <ModeButton
-                label="AI"
-                desc="deep"
+                label="Claude"
+                desc="anthropic"
                 active={mode === "ai"}
                 onClick={() => setMode("ai")}
-                icon={<Cpu className="w-3.5 h-3.5" />}
+                icon={<Cpu className="w-3.5 h-3.5" aria-hidden="true" />}
               />
               <ModeButton
-                label="Both"
+                label="Gemini"
+                desc="vertex ai"
+                active={mode === "gemini"}
+                onClick={() => setMode("gemini")}
+                icon={<Globe className="w-3.5 h-3.5" aria-hidden="true" />}
+              />
+            </div>
+            <div className="grid grid-cols-2 gap-2 mt-2">
+              <ModeButton
+                label="Both AIs"
+                desc="claude + gemini"
+                active={mode === "all"}
+                onClick={() => setMode("all")}
+                icon={<Sparkles className="w-3.5 h-3.5" aria-hidden="true" />}
+              />
+              <ModeButton
+                label="Rules + Claude"
                 desc="combo"
                 active={mode === "both"}
                 onClick={() => setMode("both")}
-                icon={<Sparkles className="w-3.5 h-3.5" />}
+                icon={<Sparkles className="w-3.5 h-3.5" aria-hidden="true" />}
               />
             </div>
             <p className="text-xs text-muted-2 mt-3 leading-relaxed">
@@ -203,31 +229,41 @@ export default function Compressor() {
                 ? "26 deterministic rules: verbose phrases, fillers, politeness, redundant meta-instructions, duplicates."
                 : mode === "ai"
                 ? "Claude Sonnet rewrites your prompt with semantic preservation. Slower, deeper cuts."
-                : "Run both — see the deterministic baseline alongside the AI-driven rewrite."}
+                : mode === "gemini"
+                ? "Gemini 2.5 Flash via Vertex AI on Google Cloud — same task, different model perspective."
+                : mode === "all"
+                ? "Run Claude and Gemini side-by-side. Pick whichever cuts deeper without losing intent."
+                : "Run rules + Claude — see the deterministic baseline alongside the AI-driven rewrite."}
             </p>
           </div>
 
           <button
+            type="button"
             onClick={run}
             disabled={!input.trim() || loading}
-            className="btn-primary w-full inline-flex items-center justify-center gap-2"
+            aria-busy={loading}
+            aria-label={loading ? "Compressing prompt" : "Compress prompt"}
+            className="btn-primary w-full inline-flex items-center justify-center gap-2 focus:outline-none focus-visible:ring-2 focus-visible:ring-neon"
           >
             {loading ? (
               <>
-                <Loader2 className="w-4 h-4 animate-spin" />
+                <Loader2 className="w-4 h-4 animate-spin" aria-hidden="true" />
                 Compressing…
               </>
             ) : (
               <>
-                <Sparkles className="w-4 h-4" />
+                <Sparkles className="w-4 h-4" aria-hidden="true" />
                 Compress prompt
               </>
             )}
           </button>
 
           {error && (
-            <div className="text-sm text-danger flex items-start gap-2 p-3 rounded-lg border border-danger/30 bg-danger-soft">
-              <AlertCircle className="w-4 h-4 mt-0.5 shrink-0" />
+            <div
+              role="alert"
+              className="text-sm text-danger flex items-start gap-2 p-3 rounded-lg border border-danger/30 bg-danger-soft"
+            >
+              <AlertCircle className="w-4 h-4 mt-0.5 shrink-0" aria-hidden="true" />
               <span>{error}</span>
             </div>
           )}
@@ -285,8 +321,11 @@ function ModeButton({
 }) {
   return (
     <button
+      type="button"
       onClick={onClick}
-      className={`relative rounded-lg p-3 text-left border transition-all ${
+      aria-pressed={active}
+      aria-label={`Compression mode: ${label}`}
+      className={`relative rounded-lg p-3 text-left border transition-all focus:outline-none focus-visible:ring-2 focus-visible:ring-neon ${
         active
           ? "border-neon bg-neon-soft text-foreground shadow-[0_0_0_1px_var(--neon),0_8px_24px_-12px_rgba(180,252,74,0.4)]"
           : "border-border bg-surface-2 text-muted hover:border-border-strong hover:text-foreground"
@@ -317,18 +356,26 @@ function Results({
   const tokensOriginal = countTokens(originalInput);
   const tokensRules = countTokens(data.rules.compressed);
   const tokensAI = data.ai ? countTokens(data.ai.compressed) : null;
+  const tokensGemini = data.gemini ? countTokens(data.gemini.compressed) : null;
 
-  // Pick the "best" compressed version: smaller wins, but if AI failed, fall back.
-  const bestTokens =
-    tokensAI !== null && tokensAI > 0 && tokensAI < tokensRules
-      ? tokensAI
-      : tokensRules;
-  const bestText =
-    tokensAI !== null && tokensAI > 0 && tokensAI < tokensRules
-      ? data.ai!.compressed
-      : data.rules.compressed;
-  const bestSource =
-    tokensAI !== null && tokensAI > 0 && tokensAI < tokensRules ? "ai" : "rules";
+  type SrcLabel = "rules" | "ai" | "gemini";
+  const candidates: { src: SrcLabel; tokens: number; text: string }[] = [
+    { src: "rules", tokens: tokensRules, text: data.rules.compressed },
+  ];
+  if (tokensAI !== null && tokensAI > 0)
+    candidates.push({ src: "ai", tokens: tokensAI, text: data.ai!.compressed });
+  if (tokensGemini !== null && tokensGemini > 0)
+    candidates.push({
+      src: "gemini",
+      tokens: tokensGemini,
+      text: data.gemini!.compressed,
+    });
+  const winner = candidates.reduce((best, c) =>
+    c.tokens > 0 && c.tokens < best.tokens ? c : best,
+  );
+  const bestTokens = winner.tokens;
+  const bestText = winner.text;
+  const bestSource = winner.src;
 
   const tokenSavings = tokensOriginal - bestTokens;
   const pctSaved =
@@ -379,12 +426,25 @@ function Results({
 
       <CutsBreakdown stats={data.rules.stats} />
 
-      {/* AI panel */}
-      {(mode === "ai" || mode === "both") && (
+      {/* Claude panel */}
+      {(mode === "ai" || mode === "both" || mode === "all") && (
         <AIPanel
+          provider="Claude"
+          subtitle="claude-sonnet-4-6"
           ai={data.ai}
           aiError={data.aiError}
           tokens={tokensAI ?? 0}
+        />
+      )}
+
+      {/* Gemini panel */}
+      {(mode === "gemini" || mode === "all") && (
+        <AIPanel
+          provider="Gemini"
+          subtitle="gemini-2.5-flash · Vertex AI"
+          ai={data.gemini}
+          aiError={data.geminiError}
+          tokens={tokensGemini ?? 0}
         />
       )}
 
@@ -407,7 +467,7 @@ function SavingsCard({
   tokensOriginal: number;
   tokensCompressed: number;
   pctSaved: number;
-  source: "rules" | "ai";
+  source: "rules" | "ai" | "gemini";
 }) {
   // Project savings against Sonnet 4.6 as the default illustrative model
   const sonnet = MODELS.find((m) => m.id === "claude-sonnet-4-6")!;
@@ -446,7 +506,9 @@ function SavingsCard({
         <Stat
           label="engine"
           value={0}
-          fmt={() => (source === "ai" ? "AI" : "Rules")}
+          fmt={() =>
+            source === "ai" ? "Claude" : source === "gemini" ? "Gemini" : "Rules"
+          }
         />
       </div>
       <div className="relative mt-6 flex items-center gap-2 text-sm text-muted">
@@ -529,11 +591,15 @@ function CutsBreakdown({ stats }: { stats: CompressResult["stats"] }) {
 }
 
 function AIPanel({
+  provider,
+  subtitle,
   ai,
   aiError,
   tokens,
 }: {
-  ai: ApiResponse["ai"];
+  provider: string;
+  subtitle: string;
+  ai: ApiResponse["ai"] | ApiResponse["gemini"];
   aiError?: string;
   tokens: number;
 }) {
@@ -541,19 +607,14 @@ function AIPanel({
     return (
       <div className="card p-5">
         <div className="flex items-center gap-2 mb-2">
-          <span className="chip">AI compression</span>
-          <span className="text-xs text-muted-2">claude-sonnet-4-6</span>
+          <span className="chip">{provider}</span>
+          <span className="text-xs text-muted-2">{subtitle}</span>
         </div>
         <div className="text-sm text-warn flex items-start gap-2">
-          <AlertCircle className="w-4 h-4 mt-0.5 shrink-0" />
+          <AlertCircle className="w-4 h-4 mt-0.5 shrink-0" aria-hidden="true" />
           <div>
-            <div className="text-foreground">AI compression unavailable.</div>
+            <div className="text-foreground">{provider} compression unavailable.</div>
             <div className="text-muted-2 text-xs mt-1">{aiError}</div>
-            <div className="text-muted text-xs mt-2">
-              Add <code className="text-light">ANTHROPIC_API_KEY</code> to
-              <code className="text-light mx-1">.env.local</code> to enable
-              deep-compression mode.
-            </div>
           </div>
         </div>
       </div>
@@ -564,7 +625,8 @@ function AIPanel({
     <div className="card p-5">
       <div className="flex items-center justify-between mb-3">
         <div className="flex items-center gap-2">
-          <span className="chip">AI compression notes</span>
+          <span className="chip">{provider} · notes</span>
+          <span className="text-xs text-muted-2">{subtitle}</span>
           <span className="text-xs text-muted tabular">{tokens} tokens</span>
         </div>
         <CopyButton text={ai.compressed} />
@@ -592,6 +654,7 @@ function CopyButton({ text }: { text: string }) {
   const [copied, setCopied] = useState(false);
   return (
     <button
+      type="button"
       onClick={async () => {
         try {
           await navigator.clipboard.writeText(text);
@@ -601,15 +664,17 @@ function CopyButton({ text }: { text: string }) {
           /* noop */
         }
       }}
-      className="text-xs text-muted hover:text-neon inline-flex items-center gap-1.5 transition-colors"
+      aria-label={copied ? "Copied to clipboard" : "Copy to clipboard"}
+      aria-live="polite"
+      className="text-xs text-muted hover:text-neon inline-flex items-center gap-1.5 transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-neon rounded"
     >
       {copied ? (
         <>
-          <Check className="w-3 h-3" /> copied
+          <Check className="w-3 h-3" aria-hidden="true" /> copied
         </>
       ) : (
         <>
-          <Copy className="w-3 h-3" /> copy
+          <Copy className="w-3 h-3" aria-hidden="true" /> copy
         </>
       )}
     </button>

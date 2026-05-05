@@ -1,0 +1,85 @@
+// Firestore-backed prompt history. Fire-and-forget on the API route so
+// observability never adds latency to the user request. Falls back to a
+// no-op when GCP creds are unavailable (e.g., local dev without ADC).
+
+import { Firestore } from "@google-cloud/firestore";
+
+let db: Firestore | null = null;
+let disabled = false;
+
+function projectId(): string | null {
+  return (
+    process.env.GOOGLE_CLOUD_PROJECT ||
+    process.env.GCP_PROJECT ||
+    process.env.GCLOUD_PROJECT ||
+    null
+  );
+}
+
+function getDb(): Firestore | null {
+  if (disabled) return null;
+  if (db) return db;
+  const project = projectId();
+  if (!project) {
+    disabled = true;
+    return null;
+  }
+  try {
+    db = new Firestore({
+      projectId: project,
+      databaseId: process.env.FIRESTORE_DATABASE_ID || "(default)",
+    });
+    return db;
+  } catch {
+    disabled = true;
+    return null;
+  }
+}
+
+export type CompressionRecord = {
+  ip: string;
+  mode: "rules" | "ai" | "gemini" | "both" | "all";
+  promptPreview: string;
+  promptChars: number;
+  tokensBefore: number;
+  tokensAfter: number;
+  pctSaved: number;
+  cache: "hit" | "miss" | "n/a";
+};
+
+const COLLECTION = "compressions";
+
+export function logCompression(record: CompressionRecord): void {
+  const store = getDb();
+  if (!store) return;
+  void store
+    .collection(COLLECTION)
+    .add({ ...record, ts: new Date() })
+    .catch(() => {
+      // Swallow errors — observability must never break the request.
+    });
+}
+
+export async function recentCompressions(limit = 20): Promise<
+  (CompressionRecord & { ts: Date })[]
+> {
+  const store = getDb();
+  if (!store) return [];
+  try {
+    const snap = await store
+      .collection(COLLECTION)
+      .orderBy("ts", "desc")
+      .limit(limit)
+      .get();
+    return snap.docs.map((d) => {
+      const data = d.data() as CompressionRecord & { ts: { toDate(): Date } };
+      return { ...data, ts: data.ts.toDate() };
+    });
+  } catch {
+    return [];
+  }
+}
+
+export function firestoreAvailable(): boolean {
+  return getDb() !== null;
+}

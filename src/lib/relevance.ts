@@ -3,7 +3,7 @@
 // (numbers, capitalized entities, code) to produce a 0..1 relevance score
 // for each candidate chunk against a question.
 
-import { countTokens } from "./tokenizer";
+import { countTokens } from "./tokenizer.ts";
 
 const STOPWORDS = new Set([
   "a","an","the","of","to","in","on","at","for","with","by","from","is","are","was","were","be","been","being",

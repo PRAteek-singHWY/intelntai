@@ -6,10 +6,14 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "test": "node --test --experimental-strip-types --no-warnings src/lib/compress.test.ts"
+    "test": "node --test --experimental-strip-types --no-warnings 'src/lib/**/*.test.ts'"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.93.0",
+    "@google-cloud/firestore": "^8.5.0",
+    "@google-cloud/logging": "^11.2.1",
+    "@google-cloud/secret-manager": "^6.1.2",
+    "@google/genai": "^1.52.0",
     "clsx": "^2.1.1",
     "framer-motion": "^12.38.0",
     "gpt-tokenizer": "^3.4.0",

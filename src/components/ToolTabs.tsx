@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Wand2, Filter, Activity, Trophy } from "lucide-react";
 import Compressor from "./Compressor";
@@ -39,6 +39,24 @@ type TabId = (typeof TABS)[number]["id"];
 
 export default function ToolTabs() {
   const [active, setActive] = useState<TabId>("compress");
+  const tablistRef = useRef<HTMLDivElement>(null);
+
+  const onKeyDown = (e: React.KeyboardEvent<HTMLDivElement>) => {
+    if (e.key !== "ArrowLeft" && e.key !== "ArrowRight") return;
+    const idx = TABS.findIndex((t) => t.id === active);
+    if (idx === -1) return;
+    const next =
+      e.key === "ArrowRight"
+        ? TABS[(idx + 1) % TABS.length]
+        : TABS[(idx - 1 + TABS.length) % TABS.length];
+    setActive(next.id);
+    requestAnimationFrame(() => {
+      const el = tablistRef.current?.querySelector<HTMLButtonElement>(
+        `[data-tab-id="${next.id}"]`,
+      );
+      el?.focus();
+    });
+  };
 
   return (
     <section id="tools" className="max-w-7xl mx-auto px-6 pt-10">
@@ -58,7 +76,10 @@ export default function ToolTabs() {
       </div>
 
       <div
+        ref={tablistRef}
         role="tablist"
+        aria-label="Token optimization tools"
+        onKeyDown={onKeyDown}
         className="card p-1.5 grid grid-cols-2 md:grid-cols-4 gap-1.5 mb-8"
       >
         {TABS.map((t) => {
@@ -67,10 +88,14 @@ export default function ToolTabs() {
           return (
             <button
               key={t.id}
+              data-tab-id={t.id}
               role="tab"
+              id={`tab-${t.id}`}
+              aria-controls={`panel-${t.id}`}
               aria-selected={isActive}
+              tabIndex={isActive ? 0 : -1}
               onClick={() => setActive(t.id)}
-              className={`relative px-4 py-3 rounded-lg text-left transition-all ${
+              className={`relative px-4 py-3 rounded-lg text-left transition-all focus:outline-none focus-visible:ring-2 focus-visible:ring-neon ${
                 isActive
                   ? "bg-surface-3 text-foreground"
                   : "text-muted hover:text-foreground hover:bg-surface-2"
@@ -85,6 +110,7 @@ export default function ToolTabs() {
               )}
               <div className="relative flex items-center gap-2">
                 <Icon
+                  aria-hidden="true"
                   className={`w-4 h-4 ${
                     isActive ? "text-neon" : "text-muted-2"
                   }`}
@@ -102,6 +128,9 @@ export default function ToolTabs() {
       <AnimatePresence mode="wait">
         <motion.div
           key={active}
+          role="tabpanel"
+          id={`panel-${active}`}
+          aria-labelledby={`tab-${active}`}
           initial={{ opacity: 0, y: 8 }}
           animate={{ opacity: 1, y: 0 }}
           exit={{ opacity: 0, y: -8 }}

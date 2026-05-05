@@ -5,13 +5,19 @@ import { rateLimit, clientIp } from "@/lib/rate-limit";
 import { cacheGet, cacheSet, cacheKey } from "@/lib/cache";
 import { spendAllowed, recordSpend, spendStats } from "@/lib/spend-cap";
 import { log } from "@/lib/log";
+import { getAnthropicKey } from "@/lib/gcp/secrets";
+import { geminiCompress, geminiAvailable } from "@/lib/gcp/gemini";
+import { logCompression } from "@/lib/gcp/firestore";
+import { countTokens } from "@/lib/tokenizer";
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
 
+type Mode = "rules" | "ai" | "gemini" | "both" | "all";
+
 type Body = {
   prompt: string;
-  mode?: "rules" | "ai" | "both";
+  mode?: Mode;
 };
 
 type AiResult = { compressed: string; notes: string[] };
@@ -19,7 +25,9 @@ type AiResult = { compressed: string; notes: string[] };
 type Response = {
   rules: CompressResult;
   ai?: AiResult | null;
+  gemini?: AiResult | null;
   aiError?: string;
+  geminiError?: string;
   cache?: "hit" | "miss";
 };
 
@@ -42,7 +50,7 @@ Return strict JSON of the form:
 No prose outside the JSON. No markdown fences.`;
 
 async function aiCompress(prompt: string): Promise<AiResult> {
-  const apiKey = process.env.ANTHROPIC_API_KEY;
+  const apiKey = await getAnthropicKey();
   if (!apiKey) throw new Error("ANTHROPIC_API_KEY not configured");
 
   const client = new Anthropic({ apiKey });
@@ -105,14 +113,17 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Prompt too large (>50k chars)" }, { status: 413 });
   }
 
-  const mode = body.mode ?? "rules";
+  const mode: Mode = body.mode ?? "rules";
   const rules = compressRuleBased(prompt);
   const response: Response = { rules };
   const headers: Record<string, string> = {
     "X-RateLimit-Remaining": String(limit.remaining),
   };
 
-  if (mode === "ai" || mode === "both") {
+  const wantsClaude = mode === "ai" || mode === "both" || mode === "all";
+  const wantsGemini = mode === "gemini" || mode === "all";
+
+  if (wantsClaude) {
     const key = cacheKey(["ai", prompt]);
     const cached = cacheGet<AiResult>(key);
 
@@ -145,9 +156,54 @@ export async function POST(req: NextRequest) {
         log("error", "ai_compress_failed", { ip, error: response.aiError });
       }
     }
-  } else {
+  }
+
+  if (wantsGemini) {
+    if (!geminiAvailable()) {
+      response.gemini = null;
+      response.geminiError =
+        "Gemini not configured — set GOOGLE_CLOUD_PROJECT (Vertex AI) or GEMINI_API_KEY.";
+    } else {
+      const gKey = cacheKey(["gemini", prompt]);
+      const gCached = cacheGet<AiResult>(gKey);
+      if (gCached) {
+        response.gemini = gCached;
+        log("info", "gemini_compress", { ip, mode, cache: "hit" });
+      } else {
+        try {
+          const g = await geminiCompress(prompt);
+          cacheSet(gKey, g);
+          response.gemini = g;
+          log("info", "gemini_compress", { ip, mode, cache: "miss" });
+        } catch (err) {
+          response.gemini = null;
+          response.geminiError =
+            err instanceof Error ? err.message : "Gemini compression failed";
+          log("error", "gemini_compress_failed", { ip, error: response.geminiError });
+        }
+      }
+    }
+  }
+
+  if (!wantsClaude && !wantsGemini) {
     log("info", "compress", { ip, mode, chars: prompt.length });
   }
+
+  // Fire-and-forget Firestore log (never blocks the response).
+  const tokensBefore = countTokens(prompt);
+  const tokensAfter = countTokens(rules.compressed);
+  const pctSaved =
+    tokensBefore > 0 ? ((tokensBefore - tokensAfter) / tokensBefore) * 100 : 0;
+  logCompression({
+    ip,
+    mode,
+    promptPreview: prompt.slice(0, 200),
+    promptChars: prompt.length,
+    tokensBefore,
+    tokensAfter,
+    pctSaved: +pctSaved.toFixed(2),
+    cache: response.cache ?? "n/a",
+  });
 
   return NextResponse.json(response, { headers });
 }
