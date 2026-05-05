@@ -1,4 +1,4 @@
-import { Sparkles, GitFork } from "lucide-react";
+import { Sparkles } from "lucide-react";
 
 export default function Footer() {
   return (
@@ -13,15 +13,6 @@ export default function Footer() {
         </div>
         <div className="text-xs text-muted-2 flex items-center gap-4">
           <span>Built solo for PromptWars × Google × Scaler · 2026</span>
-          <a
-            href="https://github.com/PRAteek-singHWY/intelntai"
-            target="_blank"
-            rel="noreferrer"
-            className="hover:text-neon transition-colors inline-flex items-center gap-1.5"
-          >
-            <GitFork className="w-3 h-3" />
-            source
-          </a>
         </div>
       </div>
     </footer>

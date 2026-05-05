@@ -1,6 +1,6 @@
 "use client";
 
-import { GitFork, Sparkles } from "lucide-react";
+import { Sparkles } from "lucide-react";
 
 export default function Header() {
   return (
@@ -35,15 +35,10 @@ export default function Header() {
           </a>
         </nav>
 
-        <a
-          href="https://github.com/PRAteek-singHWY/intelntai"
-          target="_blank"
-          rel="noreferrer"
-          className="inline-flex items-center gap-2 text-sm text-muted hover:text-foreground transition-colors px-3 py-1.5 rounded-full border border-border hover:border-border-strong"
-        >
-          <GitFork className="w-3.5 h-3.5" />
-          <span className="hidden sm:inline">Source</span>
-        </a>
+        <span className="inline-flex items-center gap-2 text-sm text-muted px-3 py-1.5 rounded-full border border-border">
+          <span className="w-1.5 h-1.5 rounded-full bg-neon shadow-[0_0_8px] shadow-neon" />
+          <span className="hidden sm:inline">Live demo</span>
+        </span>
       </div>
     </header>
   );
