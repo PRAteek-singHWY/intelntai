@@ -49,15 +49,14 @@ export type CompressionRecord = {
 
 const COLLECTION = "compressions";
 
-export function logCompression(record: CompressionRecord): void {
+export async function logCompression(record: CompressionRecord): Promise<void> {
   const store = getDb();
   if (!store) return;
-  void store
-    .collection(COLLECTION)
-    .add({ ...record, ts: new Date() })
-    .catch(() => {
-      // Swallow errors — observability must never break the request.
-    });
+  try {
+    await store.collection(COLLECTION).add({ ...record, ts: new Date() });
+  } catch {
+    // Swallow errors — observability must never break the request.
+  }
 }
 
 export async function recentCompressions(limit = 20): Promise<

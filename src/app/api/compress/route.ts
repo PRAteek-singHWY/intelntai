@@ -189,12 +189,14 @@ export async function POST(req: NextRequest) {
     log("info", "compress", { ip, mode, chars: prompt.length });
   }
 
-  // Fire-and-forget Firestore log (never blocks the response).
+  // Persist a compressed-prompt record to Firestore. We await this so the
+  // write completes before Cloud Run can throttle CPU on the function instance,
+  // but it's still a no-op when GCP creds are unavailable (e.g., local dev).
   const tokensBefore = countTokens(prompt);
   const tokensAfter = countTokens(rules.compressed);
   const pctSaved =
     tokensBefore > 0 ? ((tokensBefore - tokensAfter) / tokensBefore) * 100 : 0;
-  logCompression({
+  await logCompression({
     ip,
     mode,
     promptPreview: prompt.slice(0, 200),
